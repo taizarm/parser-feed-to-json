@@ -1,4 +1,5 @@
 import requests
+import json
 from xml.etree import ElementTree
 from collections import OrderedDict
 
@@ -78,3 +79,10 @@ class Parser(object):
 
         for item in items:
             self.json['feed'].append(self.parse_item(item))
+
+if __name__ == '__main__':
+
+    parser = Parser()
+    parser.parse_xml()
+    print(json.dumps(parser.json, sort_keys=True, indent=4,
+                     separators=(',', ': ')))

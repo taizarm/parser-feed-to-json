@@ -4,6 +4,12 @@ This project is responsible for reading a specific RSS Feed and transforming it 
 ## How to install
 
 
+## How to run standalone
+Run the command:
+```
+python parser/parser.py
+```
+
 ## How to run tests and see coverage
 
 Run the command:
