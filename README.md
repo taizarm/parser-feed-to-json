@@ -12,7 +12,7 @@ python parser/parser.py
 
 ## How to run tests and see coverage
 
-Run the command:
+Be sure virtual env is activated. Run the command:
 
 ```
 py.test --cov=parser tests/
