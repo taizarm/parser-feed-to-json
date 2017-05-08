@@ -1,8 +1,12 @@
 import pytest
-from xml.etree import ElementTree
+import os
+import json
 from mock import Mock
+from xml.etree import ElementTree
+from bs4 import BeautifulSoup
+
 from parser.parser import Parser
-from tests.test_scenarios import test_scenarios_items_elements, test_scenarios_parser
+from tests import test_scenarios
 
 
 class TestParser():
@@ -20,7 +24,7 @@ class TestParser():
         assert len(self.parser.xml_root) > 0
 
     @pytest.mark.parametrize('mock_xml, items_number',
-                             test_scenarios_items_elements)
+                             test_scenarios.test_scenarios_items_elements)
     def test_return_items_elements(self, mock_xml, items_number):
         self.parser.xml_root = ElementTree.fromstring(mock_xml)
 
@@ -71,51 +75,43 @@ class TestParser():
     def test_process_div_img_tag(self):
         description_list = []
 
-        tag = ElementTree.Element('img')
-        src_img = 'src_img'
-        tag.attrib = {'src': src_img}
-        self.parser.process_div_img_tag(tag, description_list)
+        soup = BeautifulSoup('<img src=\'img_src\'></img>', "html.parser")
+        self.parser.process_div_img_tag(soup.find('img'), description_list)
 
-        assert description_list == [{'type': 'image', 'content': src_img}]
+        assert description_list == [{'type': 'image', 'content': 'img_src'}]
 
     def test_process_div_ul_tag(self):
         description_list = []
 
-        tag = ElementTree.Element('ul')
+        soup = BeautifulSoup('<ul> '
+                             '  <li><a href=\'link1\'/></li> '
+                             '  <li><a href=\'link2\'/></li>'
+                             '<ul>', "html.parser")
 
-        sub_tag_1 = ElementTree.SubElement(tag, 'li')
-        li1_text = 'First Content'
-        sub_tag_1.text = li1_text
+        self.parser.process_div_ul_tag(soup.find('ul'), description_list)
 
-        sub_tag_2 = ElementTree.SubElement(tag, 'li')
-        li2_text = 'Second Content'
-        sub_tag_2.text = li2_text
-
-        self.parser.process_div_ul_tag(tag, description_list)
-
-        assert description_list == [{'type': 'links', 'content': [li1_text, li2_text]}]
+        assert description_list == [
+            {'type': 'links',
+             'content': ['link1', 'link2']}
+        ]
 
     def test_process_div_tag(self):
         description_list = []
 
-        tag = ElementTree.Element('div')
+        soup = BeautifulSoup('<div>'
+                             '<img src=\'img_src\'/>'
+                             '<ul> '
+                             '  <li><a href=\'link1\'/></li> '
+                             '  <li><a href=\'link2\'/></li>'
+                             '</ul>'
+                             '</div>', "html.parser")
 
-        sub_tag_1 = ElementTree.SubElement(tag, 'ul')
-        sub_sub_tag_1 = ElementTree.SubElement(sub_tag_1, 'li')
-        li1_text = 'First Content'
-        sub_sub_tag_1.text = li1_text
+        self.parser.process_div_tag(soup.find('div'), description_list)
 
-        sub_tag_2 = ElementTree.SubElement(tag, 'img')
-        src_img = 'src_img'
-        sub_tag_2.attrib = {'src': src_img}
-
-        sub_tag_3 = ElementTree.SubElement(tag, 'span')
-        sub_tag_3.text = 'Loren Ipsum'
-
-        self.parser.process_div_tag(tag, description_list)
-
-        assert description_list == [{'type': 'links', 'content': [li1_text]},
-                                    {'type': 'image', 'content': src_img}]
+        assert description_list == [
+            {'type': 'image', 'content': 'img_src'},
+            {'type': 'links', 'content': ['link1', 'link2']},
+        ]
 
     def test_parse_item(self):
         mock_xml = ('<rss><channel> <item>'
@@ -131,17 +127,16 @@ class TestParser():
         assert res['link'] == 'URL Link'
         assert res['description'] == []
 
-    @pytest.mark.parametrize('xml_content, expected_json',
-                             test_scenarios_parser)
-    def test_parse_xml(self, xml_content, expected_json):
-        self.parser.xml_root = ElementTree.fromstring(xml_content)
-
+    def test_parse_xml(self):
         self.parser.populate_xml_content = Mock(
-            side_effect=(self.side_effect(xml_content))
+            side_effect=self.side_effect_file
         )
         self.parser.parse_xml()
 
-        assert self.parser.json == expected_json
+        assert self.parser.json == test_scenarios.feed_input_file_expected_json
 
-    def side_effect(*args, **kwargs):
-        args[0].parser.xml_root = ElementTree.fromstring(args[1])
+    def side_effect_file(*args, **kwargs):
+        folder = os.path.dirname(__file__)
+        file_path = os.path.join(folder, 'feed_input_test.xml')
+
+        args[0].parser.xml_root = ElementTree.parse(file_path).getroot()
